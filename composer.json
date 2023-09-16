@@ -1,0 +1,32 @@
+{
+  "name": "yireo/shopware6-luma-sample-data",
+  "description": "Import Magento 2 Luma Sample Data into Shopware 6",
+  "type": "shopware-platform-plugin",
+  "version": "1.0.0",
+  "authors": [
+    {
+      "name": "Jisse Reitsma"
+    }
+  ],
+  "require": {
+    "league/csv" :"^9.0",
+    "shopware/core": "~6.4",
+    "ext-fileinfo": "*"
+  },
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "Yireo\\LumaSampleData\\": "src/"
+    }
+  },
+  "extra": {
+    "shopware-plugin-class": "Yireo\\LumaSampleData\\YireoLumaSampleData",
+    "copyright": "Jisse Reitsma",
+    "label": {
+      "en-GB": "YireoLumaSampleData"
+    },
+    "description": {
+      "en-GB": "Import Magento 2 Luma Sample Data into Shopware 6"
+    }
+  }
+}
