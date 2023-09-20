@@ -15,9 +15,12 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 class ProductCreator
 {
+    private ?string $salesChannelId = null;
+
     public function __construct(
         #[Autowire(service: 'product.repository')] private EntityRepository $productRepository,
         #[Autowire(service: 'product_visibility.repository')] private EntityRepository $productVisibilityRepository,
+        #[Autowire(service: 'sales_channel.repository')] private EntityRepository $salesChannelRepository,
         private ColumnMapper $columnMapper,
         private Connection $connection,
         private CategoryCreator $categoryCreator
@@ -102,7 +105,23 @@ class ProductCreator
 
     private function getStorefrontSalesChannelId(): string
     {
-        return Defaults::SALES_CHANNEL_TYPE_STOREFRONT;
+        if ($this->salesChannelId === null) {
+            $this->salesChannelId = $this->searchStorefrontSalesChannelId();
+        }
+
+        return $this->salesChannelId;
+    }
+
+    private function searchStorefrontSalesChannelId(): string
+    {
+        $context = Context::createDefaultContext();
+
+        $criteria = new Criteria();
+        $criteria->addFilter(new EqualsFilter('typeId', Defaults::SALES_CHANNEL_TYPE_STOREFRONT));
+
+        $context = Context::createDefaultContext();
+        $result = $this->salesChannelRepository->searchIds($criteria, $context);
+        return $result->firstId();
     }
 
     private function getCurrencyId(): string
