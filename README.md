@@ -2,12 +2,13 @@
 
 **This Shopware 6 plugin allows you to import Luma sample products into your Shopware instance. The Luma sample data are based upon the demo-data used in Magento 2 Luma. Note that this plugin mainly serves an educational purpose.**
 
-**STATUS: In progress. This has not reached a usable state yet.**
+**STATUS: In progress. Categories and products are imported, including product media images. The main thing that is still lacking are properties and product variants.**
 
 WARNING: This package contains about 500Mb worth of images. Just so you know.
 
 ## Installation
 ```bash
+composer require yireo/shopware6-luma-sample-data:@dev --dev
 bin/console plugin:refresh
 bin/console plugin:install --activate YireoLumaSampleData
 ```
