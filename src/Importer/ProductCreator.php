@@ -3,10 +3,14 @@
 namespace Yireo\LumaSampleData\Importer;
 
 use Doctrine\DBAL\Connection;
+use Exception;
 use RuntimeException;
+use Shopware\Core\Content\Category\CategoryEntity;
 use Shopware\Core\Content\Product\Aggregate\ProductVisibility\ProductVisibilityDefinition;
+use Shopware\Core\Content\Product\ProductEntity;
 use Shopware\Core\Defaults;
 use Shopware\Core\Framework\Context;
+use Shopware\Core\Framework\DataAbstractionLayer\EntityCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
@@ -27,8 +31,12 @@ class ProductCreator
     ) {
     }
 
-    public function create($importData): bool
+    public function create($importData, bool $recreate = false): bool
     {
+        if ($this->productExists($importData['SKU']) && $recreate === false) {
+            return true;
+        }
+
         if (isset($importData['Categories'])) {
             [$breadcrumbCategories] = explode('|', $importData['Categories']);
             $breadcrumbCategories = explode('>', $breadcrumbCategories);
@@ -114,10 +122,9 @@ class ProductCreator
 
     private function searchStorefrontSalesChannelId(): string
     {
-        $context = Context::createDefaultContext();
-
         $criteria = new Criteria();
         $criteria->addFilter(new EqualsFilter('typeId', Defaults::SALES_CHANNEL_TYPE_STOREFRONT));
+        $criteria->setLimit(1);
 
         $context = Context::createDefaultContext();
         $result = $this->salesChannelRepository->searchIds($criteria, $context);
@@ -135,7 +142,9 @@ class ProductCreator
 
         $criteria = new Criteria();
         $criteria->addFilter(new EqualsFilter('productId', $productId));
+        $criteria->setLimit(1);
         $result = $this->productVisibilityRepository->search($criteria, $context);
+
         $visibility = $result->first();
         if ($visibility) {
             return true;
@@ -151,5 +160,35 @@ class ProductCreator
         ], $context);
 
         return true;
+    }
+
+    /**
+     * @param string $productNumber
+     * @return bool
+     */
+    private function productExists(string $productNumber): bool
+    {
+        return in_array($productNumber, $this->loadProductNumberMapping());
+    }
+
+    /**
+     * @return array
+     */
+    private function loadProductNumberMapping(): array
+    {
+        static $mapping = null;
+        if ($mapping !== null) {
+            return $mapping;
+        }
+
+        $criteria = new Criteria();
+        $result = $this->productRepository->search($criteria, Context::createDefaultContext());
+
+        $mapping = [];
+        foreach ($result->getEntities() as $product) {
+            $mapping[$product->getId()] = $product->getProductNumber();
+        }
+
+        return $mapping;
     }
 }

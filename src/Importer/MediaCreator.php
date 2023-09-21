@@ -19,44 +19,67 @@ class MediaCreator
     public function __construct(
         #[Autowire(service: 'product.repository')] private EntityRepository $productRepository,
         #[Autowire(service: 'media.repository')] private EntityRepository $mediaRepository,
+        #[Autowire(service: 'media_folder.repository')] private EntityRepository $mediaFolderRepository,
         #[Autowire(service: 'product_media.repository')] private EntityRepository $productMediaRepository,
         #[Autowire(service: 'kernel')] private Kernel $kernel,
         private ColumnMapper $columnMapper,
         private MediaService $mediaService,
         private FileSaver $fileSaver
-
     ) {
     }
 
-    public function create(array $importData): bool
+    public function create(array $importData, bool $recreate = true): bool
     {
-        $context = Context::createDefaultContext();
+        if ($this->mediaExists($importData['SKU']) && $recreate === false) {
+            return true;
+        }
 
+        $product = $this->getProductEntityFromImportData($importData);
         $importImages = explode(',', $importData['Images']);
+        $firstMediaId = null;
+
         foreach ($importImages as $importImage) {
             $filePath = $this->getImportDirectory().basename($importImage);
             $mediaId = $this->uploadImage($filePath);
-            $product = $this->getProductEntityFromImportData($importData);
             $this->linkMediaToProduct($product, $filePath, $mediaId);
+            if ($firstMediaId === null) {
+                $firstMediaId = $mediaId;
+            }
         }
 
-        $this->productRepository->update([
-            [
-                'id' => $product->getId(),
-                'coverId' => $mediaId,
-            ],
-        ], $context);
+        if (!empty($firstMediaId)) {
+            $this->setMediaAsCover($product, $firstMediaId);
+        }
 
         return true;
     }
 
-    private function isAlreadyUploaded(string $filePath): string
+    private function setMediaAsCover(ProductEntity $product, string $mediaId)
+    {
+        $context = Context::createDefaultContext();
+        $this->productRepository->update([
+            [
+                'id' => $product->getId(),
+                'cover' => [
+                    'mediaId' => $mediaId,
+                ],
+                'media' => [
+                    [
+                        'mediaId' => $mediaId,
+                    ],
+                ],
+            ],
+        ], $context);
+    }
+
+    private function isAlreadyUploaded(string $filePath): string|false
     {
         [$fileName, $fileExtension] = $this->getFilePartsFromFilename($filePath);
 
         $criteria = new Criteria;
         $criteria->addFilter(new EqualsFilter('fileName', $fileName));
         $criteria->addFilter(new EqualsFilter('fileExtension', $fileExtension));
+        $criteria->setLimit(1);
 
         $context = Context::createDefaultContext();
         $result = $this->mediaRepository->search($criteria, $context);
@@ -66,7 +89,7 @@ class MediaCreator
             return $first->getId();
         }
 
-        return '';
+        return false;
     }
 
     private function uploadImage(string $filePath): string
@@ -104,6 +127,7 @@ class MediaCreator
             [
                 'id' => Uuid::fromStringToHex('luma.media_product.'.$filePath),
                 'productId' => $product->getId(),
+                'mediaFolderId' => $this->getMediaFolderId(),
                 'mediaId' => $mediaId,
             ],
         ], $context);
@@ -149,8 +173,50 @@ class MediaCreator
         $productNumber = $importData[$column];
         $criteria = new Criteria();
         $criteria->addFilter(new EqualsFilter('productNumber', $productNumber));
+        $criteria->setLimit(1);
         $result = $this->productRepository->search($criteria, Context::createDefaultContext());
 
         return $result->first();
+    }
+
+    private function getMediaFolderId(): string
+    {
+        $criteria = new Criteria();
+        $criteria->addFilter(new EqualsFilter('name', 'Product Media'));
+        $criteria->setLimit(1);
+        $result = $this->mediaFolderRepository->search($criteria, Context::createDefaultContext());
+
+        return $result->first()->getId();
+    }
+
+
+    /**
+     * @param string $productNumber
+     * @return bool
+     */
+    private function mediaExists(string $productNumber): bool
+    {
+        return in_array($productNumber, $this->loadProductNumberMapping());
+    }
+
+    /**
+     * @return array
+     */
+    private function loadProductNumberMapping(): array
+    {
+        static $mapping = null;
+        if ($mapping !== null) {
+            return $mapping;
+        }
+
+        $criteria = new Criteria();
+        $result = $this->productRepository->search($criteria, Context::createDefaultContext());
+
+        $mapping = [];
+        foreach ($result->getEntities() as $product) {
+            $mapping[$product->getId()] = $product->getProductNumber();
+        }
+
+        return $mapping;
     }
 }

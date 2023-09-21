@@ -66,7 +66,9 @@ class CategoryCreator
     {
         $criteria = new Criteria();
         $criteria->addFilter(new EqualsFilter('name', $categoryName));
+        $criteria->setLimit(1);
         $result = $this->categoryRepository->search($criteria, Context::createDefaultContext());
+
         $category = $result->getEntities()->first();
         if ($category instanceof CategoryEntity) {
             return $category;
@@ -79,6 +81,8 @@ class CategoryCreator
     {
         $criteria = new Criteria();
         $criteria->addFilter(new EqualsFilter('level', 1));
+        $criteria->setLimit(1);
+
         $result = $this->categoryRepository->search($criteria, Context::createDefaultContext());
 
         return $result->getEntities()->first();
